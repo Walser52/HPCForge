@@ -1,0 +1,85 @@
+To load module path
+    source scripts/setup.sh
+
+This brings Core modules to the fore. 
+
+    ./scripts/02-openmpi.sh #Builds the openmpi module. 
+    #Ultimately you get ~/modules/Compilter/gcc/13.3.0/openmpi/5.0.3 for instance
+
+write_module has the structure
+    write_module LEVEL NAME VERSION ROOT EXTRA
+
+    LEVEL = core
+    LEVEL = compiler
+    LEVEL = mpi
+
+
+
+
+Or simply (in a new shell)
+
+    module purge
+    source ~/scripts/setup.sh #Brings the Core modules to the fore.
+
+Then:
+
+    module avail
+
+At this stage, you should only see the Core modules, for example:
+
+gcc/13.3.0
+
+You should not see OpenMPI yet.
+
+
+    module load gcc/13.3.0
+
+
+=================
+--module-only skips the download/build/install steps and only rewrites the module.
+--force removes the existing installation and rebuilds from scratch.
+The module file is always written after a successful install or in module-only mode.
+
+Now you can do all of these:
+
+    ./01-gcc.sh
+
+Configure GCC if needed and write the module.
+
+    ./01-gcc.sh --module-only
+
+Rewrite only the module file.
+
+    ./01-gcc.sh --force
+
+Recreate the installation (symlinks and version file) and rewrite the module.
+
+
+| Package             | Depends on               | Module level |
+| ------------------- | ------------------------ | ------------ |
+| GCC                 | —                        | Core         |
+| OpenMPI             | GCC                      | Compiler     |
+| OpenBLAS            | GCC                      | Compiler     |
+| FFTW                | GCC                      | Compiler     |
+| LibXC               | GCC                      | Compiler     |
+| **ScaLAPACK**       | GCC + OpenMPI + OpenBLAS | MPI          |
+| **HDF5 (parallel)** | GCC + OpenMPI            | MPI          |
+| Quantum ESPRESSO    | Everything above         | MPI          |
+
+
+Core
+└── gcc
+
+Compiler
+└── gcc/13.3.0
+    ├── openmpi
+    ├── openblas
+    ├── fftw
+    └── libxc
+
+MPI
+└── gcc/13.3.0
+    └── openmpi/5.0.3
+        ├── scalapack
+        ├── hdf5
+        └── qe
