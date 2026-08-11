@@ -7,25 +7,44 @@ The project was developed to build Quantum ESPRESSO and its dependencies, but it
 # Directory Layout
 
 ```
-scripts/
-│
+HPCForge/
 ├── config.sh
-├── setup.sh
 │
-├── 00-system-deps.sh
-├── 01-gcc.sh
-├── 02-openmpi.sh
-├── 03-openblas.sh
-├── 04-scalapack.sh
-├── 05-fftw.sh
-├── 06-libxc.sh
-├── 07-hdf5.sh
-└── 08-qe.sh
+├── installers/
+│   ├── 00-system-deps.sh
+│   ├── 01-gcc.sh
+│   ├── 02-openmpi.sh
+│   ├── 03-fftw.sh
+│   ├── 04-openblas.sh
+│   ├── 05-scalapack.sh
+│   ├── 06-hdf5.sh
+│   ├── 07-libxc.sh
+│   ├── 08-qe.sh
+│   ├── 09-wannier90.sh
+│   ├── 10-perturbo.sh
+│   └── 11-unfold-x.sh
 │
-├── downloads/
-├── sources/
-├── build/
-└── logs/
+<!-- ├── modules/
+│   ├── Core/
+│   ├── Compiler/
+│   ├── MPI/
+│   ├── Math/
+│   └── Applications/ -->
+│
+├── scripts/
+│   ├── qe/
+│   │   ├── run-scf.sh
+│   │   ├── run-nscf.sh
+│   │   └── run-bands.sh
+│   │
+│   ├── perturbo/
+│   │   └── ...
+│   │
+│   └── post/
+│       ├── unfold.sh
+│       └── ...
+│
+└── README.md
 ```
 
 Installed software is placed under

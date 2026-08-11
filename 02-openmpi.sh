@@ -15,9 +15,16 @@ load_toolchain
 ##############################################################################
 # OpenMPI Installation
 ##############################################################################
+# Use --version to override the default version of OpenMPI to install.
 
 NAME="openmpi"
-VERSION="$MPI_VERSION"
+
+if [[ -n "$VERSION_OVERRIDE" ]]; then
+    VERSION="$VERSION_OVERRIDE"
+else
+    VERSION="$MPI_VERSION"
+fi
+
 INSTALL="$(install_dir "$NAME" "$VERSION")"
 
 
@@ -51,7 +58,8 @@ if ! $MODULE_ONLY; then
         fi
 
         ARCHIVE="openmpi-$VERSION.tar.gz"
-        URL="https://download.open-mpi.org/release/open-mpi/v5.0/$ARCHIVE"
+        MPI_RELEASE="${VERSION%.*}"
+        URL="https://download.open-mpi.org/release/open-mpi/v${MPI_RELEASE}/$ARCHIVE"
 
         echo "Downloading OpenMPI..."
         download "$URL" "$ARCHIVE"

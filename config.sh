@@ -533,7 +533,7 @@ parse_build_args() {
     JOBS="${JOBS:-$(nproc)}"
 
     PREFIX_OVERRIDE=""
-
+    VERSION_OVERRIDE=""
     while [[ $# -gt 0 ]]; do
 
         case "$1" in
@@ -573,6 +573,12 @@ parse_build_args() {
 
                 shift
                 PREFIX_OVERRIDE="$1"
+                ;;
+
+            --version)
+
+                shift
+                VERSION_OVERRIDE="$1"
                 ;;
 
             --help|-h)
