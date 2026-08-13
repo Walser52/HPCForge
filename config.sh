@@ -534,6 +534,7 @@ parse_build_args() {
 
     PREFIX_OVERRIDE=""
     VERSION_OVERRIDE=""
+
     while [[ $# -gt 0 ]]; do
 
         case "$1" in
@@ -551,6 +552,11 @@ parse_build_args() {
             --gpu)
 
                 GPU=true
+                ;;
+
+            --cpu)
+
+                GPU=false
                 ;;
 
             --debug)
@@ -599,8 +605,11 @@ General options
 
 Build configuration
 
+    --cpu
+        Build the CPU version (default).
+
     --gpu
-        Enable GPU support.
+        Build the GPU/CUDA version.
 
     --debug
         Build a Debug version.
@@ -618,6 +627,11 @@ Installation
 
     --prefix DIR
         Override installation prefix.
+
+Version
+
+    --version VERSION
+        Override the default software version.
 
 EOF
                 exit 0

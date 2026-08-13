@@ -2,27 +2,28 @@
 
 set -euo pipefail
 
-source "$(dirname "$0")/config.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../config.sh"
 
 parse_build_args "$@"
-
 select_toolchain
 load_toolchain
 
 ##############################################################################
-# HDF5 Installation
+# OpenBLAS Installation
 ##############################################################################
 
-NAME="hdf5"
-VERSION="$HDF5_VERSION"
+NAME="openblas"
+VERSION="$OPENBLAS_VERSION"
 INSTALL="$(install_dir "$NAME" "$VERSION")"
 
 ##############################################################################
 # Prerequisites
 ##############################################################################
 
-require "$MPICC"
-require "$MPIFC"
+require "$CC"
+require "$CXX"
+require "$FC"
 require make
 
 ##############################################################################
@@ -31,44 +32,26 @@ require make
 
 if ! $MODULE_ONLY; then
 
-    if already_installed "lib/libhdf5.so"; then
-        echo "HDF5 $VERSION already installed."
-    
+    if already_installed libopenblas.so || already_installed libopenblas.a; then
+        echo "OpenBLAS $VERSION already installed."
+
     else
 
         if $FORCE; then
-            rm -rf "$BUILD/hdf5-$VERSION"
             rm -rf "$INSTALL"
         fi
 
-        ARCHIVE="hdf5-$VERSION.tar.gz"
-        URL="https://github.com/HDFGroup/hdf5/releases/download/hdf5_$VERSION/$ARCHIVE"
+        ARCHIVE="OpenBLAS-$VERSION.tar.gz"
+        URL="https://github.com/OpenMathLib/OpenBLAS/releases/download/v$VERSION/$ARCHIVE"
 
-        echo $URL
-        echo "Downloading HDF5..."
+        echo "Downloading OpenBLAS..."
         download "$URL" "$ARCHIVE"
 
         echo
         echo "Extracting..."
-        extract "$ARCHIVE" "hdf5-$VERSION"
+        extract "$ARCHIVE" "OpenBLAS-$VERSION"
 
-        rm -rf "$BUILD/hdf5-$VERSION"
-        mkdir -p "$BUILD/hdf5-$VERSION"
-
-        cd "$BUILD/hdf5-$VERSION"
-
-        echo
-        echo "Configuring..."
-
-        CC="$MPICC" \
-        FC="$MPIFC" \
-        "$SRC/hdf5-$VERSION/configure" \
-            --prefix="$INSTALL" \
-            --enable-shared \
-            --enable-static \
-            --enable-parallel \
-            --enable-fortran \
-            --enable-hl
+        cd "$SRC/OpenBLAS-$VERSION"
 
         echo
         echo "Building..."
@@ -79,7 +62,7 @@ if ! $MODULE_ONLY; then
         echo
         echo "Installing..."
 
-        make install
+        make PREFIX="$INSTALL" install
 
     fi
 
@@ -89,17 +72,22 @@ fi
 # Verify installation
 ##############################################################################
 
-if ! library_exists "libhdf5.so"; then
+if ! library_exists "libopenblas.so" && ! library_exists "libopenblas.a"; then
     echo
-    echo "ERROR: HDF5 installation failed."
+    echo "ERROR: OpenBLAS installation failed."
     exit 1
 fi
 
 ##############################################################################
 # Module
 ##############################################################################
+echo "COMPILER=$COMPILER"
+echo "COMPILER_VERSION=$COMPILER_VERSION"
+echo "INSTALL=$INSTALL"
+echo "MODULE PATH=$MODULES/Compiler/$COMPILER/$COMPILER_VERSION/$NAME/$VERSION.lua"
 
-write_module mpi "$NAME" "$VERSION" "$INSTALL" ""
+# write_module compiler "$NAME" "$VERSION" "$INSTALL"
+write_module compiler "$NAME" "$VERSION" "$INSTALL" ""
 
 ##############################################################################
 # Summary
@@ -107,7 +95,7 @@ write_module mpi "$NAME" "$VERSION" "$INSTALL" ""
 
 echo
 echo "=============================================================="
-echo " HDF5 $VERSION"
+echo " OpenBLAS $VERSION"
 echo "=============================================================="
 
 echo
@@ -116,7 +104,7 @@ echo "  $INSTALL"
 
 echo
 echo "Module:"
-echo "  $MODULES/MPI/$COMPILER/$COMPILER_VERSION/$MPI/$MPI_VERSION/$NAME/$VERSION.lua"
+echo "  $MODULES/Compiler/$COMPILER/$COMPILER_VERSION/$NAME/$VERSION.lua"
 
 echo
 echo "Done."

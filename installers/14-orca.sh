@@ -29,8 +29,12 @@
 
 set -euo pipefail
 
-source "$(dirname "$0")/config.sh"
-source "$(dirname "$0")/reports.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../config.sh"
+source "$SCRIPT_DIR/../reports.sh"
+
+# source "$(dirname "$0")/config.sh"
+# source "$(dirname "$0")/reports.sh"
 
 parse_build_args "$@"
 

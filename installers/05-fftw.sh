@@ -2,18 +2,19 @@
 
 set -euo pipefail
 
-source "$(dirname "$0")/config.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../config.sh"
 
 parse_build_args "$@"
 select_toolchain
 load_toolchain
 
 ##############################################################################
-# OpenBLAS Installation
+# FFTW Installation
 ##############################################################################
 
-NAME="openblas"
-VERSION="$OPENBLAS_VERSION"
+NAME="fftw"
+VERSION="$FFTW_VERSION"
 INSTALL="$(install_dir "$NAME" "$VERSION")"
 
 ##############################################################################
@@ -21,7 +22,6 @@ INSTALL="$(install_dir "$NAME" "$VERSION")"
 ##############################################################################
 
 require "$CC"
-require "$CXX"
 require "$FC"
 require make
 
@@ -31,8 +31,8 @@ require make
 
 if ! $MODULE_ONLY; then
 
-    if already_installed libopenblas.so || already_installed libopenblas.a; then
-        echo "OpenBLAS $VERSION already installed."
+    if already_installed "lib/libfftw3.so"; then
+        echo "FFTW $VERSION already installed."
 
     else
 
@@ -40,28 +40,42 @@ if ! $MODULE_ONLY; then
             rm -rf "$INSTALL"
         fi
 
-        ARCHIVE="OpenBLAS-$VERSION.tar.gz"
-        URL="https://github.com/OpenMathLib/OpenBLAS/releases/download/v$VERSION/$ARCHIVE"
+        ARCHIVE="fftw-$VERSION.tar.gz"
+        URL="https://www.fftw.org/$ARCHIVE"
 
-        echo "Downloading OpenBLAS..."
+        echo "Downloading FFTW..."
         download "$URL" "$ARCHIVE"
 
         echo
         echo "Extracting..."
-        extract "$ARCHIVE" "OpenBLAS-$VERSION"
+        extract "$ARCHIVE" "fftw-$VERSION"
 
-        cd "$SRC/OpenBLAS-$VERSION"
+        rm -rf "$BUILD/fftw-$VERSION"
+        mkdir -p "$BUILD/fftw-$VERSION"
+
+        cd "$BUILD/fftw-$VERSION"
+
+        echo
+        echo "Configuring..."
+
+        "$SRC/fftw-$VERSION/configure" \
+            --prefix="$INSTALL" \
+            --enable-shared \
+            --enable-static \
+            --enable-openmp \
+            CC="$CC" \
+            FC="$FC"
 
         echo
         echo "Building..."
 
         # make -j"$(nproc)"
         make -j"$JOBS"
-
+        
         echo
         echo "Installing..."
 
-        make PREFIX="$INSTALL" install
+        make install
 
     fi
 
@@ -71,21 +85,16 @@ fi
 # Verify installation
 ##############################################################################
 
-if ! library_exists "libopenblas.so" && ! library_exists "libopenblas.a"; then
+if ! installed "$INSTALL/lib/libfftw3.so"; then
     echo
-    echo "ERROR: OpenBLAS installation failed."
+    echo "ERROR: FFTW installation failed."
     exit 1
 fi
 
 ##############################################################################
 # Module
 ##############################################################################
-echo "COMPILER=$COMPILER"
-echo "COMPILER_VERSION=$COMPILER_VERSION"
-echo "INSTALL=$INSTALL"
-echo "MODULE PATH=$MODULES/Compiler/$COMPILER/$COMPILER_VERSION/$NAME/$VERSION.lua"
 
-# write_module compiler "$NAME" "$VERSION" "$INSTALL"
 write_module compiler "$NAME" "$VERSION" "$INSTALL" ""
 
 ##############################################################################
@@ -94,7 +103,7 @@ write_module compiler "$NAME" "$VERSION" "$INSTALL" ""
 
 echo
 echo "=============================================================="
-echo " OpenBLAS $VERSION"
+echo " FFTW $VERSION"
 echo "=============================================================="
 
 echo
@@ -107,3 +116,23 @@ echo "  $MODULES/Compiler/$COMPILER/$COMPILER_VERSION/$NAME/$VERSION.lua"
 
 echo
 echo "Done."
+
+# Remarks
+# =========================================
+# FFTW actually comes in several variants:
+
+# double precision (libfftw3)
+# single precision (libfftw3f)
+# long double (libfftw3l)
+# MPI (libfftw3_mpi)
+# OpenMP (libfftw3_omp)
+
+# The script above builds the standard double-precision library with OpenMP support, which is sufficient for Quantum ESPRESSO.
+
+# A couple of choices I'd make:
+
+    # Build shared libraries (--enable-shared).
+    # Also build static libraries (--enable-static).
+    # Enable OpenMP support (--enable-openmp) so QE can take advantage of threaded FFTs.
+    # Install into your toolchain directory.
+    # Keep it as a compiler-level module.

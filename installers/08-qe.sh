@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
 
 ##############################################################################
-# USAGE: 
-#   ./08-qe.sh
-# will build a CPU version.
-# 
-#   ./08-qe.sh --gpu
-# will first check:
-#   ✓ CUDA_HOME exists
-#   ✓ nvcc exists
-#   ✓ CUDA_ARCH is valid
-# before CMake is invoked.
-# To set the gpu version go to config.sh.
-
+# USAGE:
+#
+# ./08-qe.sh
+#     Build the default CPU version.
+#
+# ./08-qe.sh --gpu
+#     Build the GPU version.
+#
+# ./08-qe.sh --version 7.4
+#     Build QE 7.4 (CPU).
+#
+# ./08-qe.sh --version 7.4 --gpu
+#     Build QE 7.4 (GPU).
+#
 ##############################################################################
 #
 # Quantum ESPRESSO Installer
@@ -21,21 +23,27 @@
 #
 # Features
 #
-#   • Out-of-source build
-#   • Supports --force
-#   • Supports --module-only
-#   • Supports --gpu
-#   • Supports --jobs N
-#   • Generates an Lmod module
+# • Out-of-source build
+# • Supports --force
+# • Supports --module-only
+# • Supports --gpu
+# • Supports --cpu
+# • Supports --version
+# • Supports --jobs N
+# • Generates an Lmod module
 #
 ##############################################################################
 
 # set -euo pipefail
 
-
-source "$(dirname "$0")/config.sh"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../config.sh"
 
 parse_build_args "$@"
+
+##############################################################################
+# Toolchain
+##############################################################################
 
 if $GPU; then
     COMPILER="nvhpc"
@@ -56,9 +64,32 @@ fi
 ##############################################################################
 
 NAME="qe"
-VERSION="$QE_VERSION"
 
-INSTALL="$(install_dir "$NAME" "$VERSION")"
+VERSION="${VERSION_OVERRIDE:-$QE_VERSION}"
+
+##############################################################################
+# Installation
+##############################################################################
+#
+# The module name is always:
+#
+#     qe/$VERSION
+#
+# The module hierarchy distinguishes the toolchain:
+#
+#     .../gcc/.../qe/$VERSION
+#     .../nvhpc/.../qe/$VERSION
+#
+# The physical installation follows the same hierarchy so that CPU and
+# GPU builds of the same QE version do not overwrite one another.
+#
+##############################################################################
+
+BASE_INSTALL="$(install_dir "$NAME" "$VERSION")"
+
+INSTALL="$BASE_INSTALL/$COMPILER/$COMPILER_VERSION/$MPI/$MPI_VERSION"
+
+BUILD_DIR="$BUILD/qe-$VERSION-$COMPILER-$COMPILER_VERSION-$MPI-$MPI_VERSION"
 
 ##############################################################################
 # Prerequisites
@@ -71,51 +102,105 @@ require make
 
 echo "Checking dependencies..."
 
-find_package_library "$OPENBLAS_ROOT"  libopenblas.so >/dev/null \
-    || { echo "OpenBLAS not found."; exit 1; }
+find_package_library "$OPENBLAS_ROOT" libopenblas.so >/dev/null \
+    || {
+        echo "OpenBLAS not found."
+        exit 1
+    }
 
 find_package_library "$SCALAPACK_ROOT" libscalapack.so >/dev/null \
-    || { echo "ScaLAPACK not found."; exit 1; }
+    || {
+        echo "ScaLAPACK not found."
+        exit 1
+    }
 
 find_package_library "$FFTW_ROOT" libfftw3.so >/dev/null \
-    || { echo "FFTW not found."; exit 1; }
+    || {
+        echo "FFTW not found."
+        exit 1
+    }
 
 echo "Finding LibXC"
 
 find_package_library "$LIBXC_ROOT" libxc.so >/dev/null \
-|| find_package_library "$LIBXC_ROOT" libxc.a >/dev/null \
-|| {
-    echo "LibXC not found."
-    exit 1
-}
+    || find_package_library "$LIBXC_ROOT" libxc.a >/dev/null \
+    || {
+        echo "LibXC not found."
+        exit 1
+    }
 
 find_package_library "$LIBXC_ROOT" libxcf03.so >/dev/null \
-|| find_package_library "$LIBXC_ROOT" libxcf03.a >/dev/null \
-|| {
-    echo "LibXC Fortran interface not found."
-    exit 1
-}
+    || find_package_library "$LIBXC_ROOT" libxcf03.a >/dev/null \
+    || {
+        echo "LibXC Fortran interface not found."
+        exit 1
+    }
 
-echo "Finding hdf5"
+echo "Finding HDF5"
 
 find_package_library "$HDF5_ROOT" libhdf5.so >/dev/null \
-    || { echo "HDF5 not found."; exit 1; }
+    || {
+        echo "HDF5 not found."
+        exit 1
+    }
 
 ##############################################################################
 # Build / Install
 ##############################################################################
 
-echo "checking module $MODULE_ONLY"
+echo
+echo "============================================================="
+echo " Quantum ESPRESSO $VERSION"
+echo "============================================================="
+echo
+
+echo "Build configuration:"
+if $GPU; then
+    echo "    Accelerator : CUDA"
+    echo "    Compiler    : $COMPILER/$COMPILER_VERSION"
+else
+    echo "    Accelerator : CPU"
+    echo "    Compiler    : $COMPILER/$COMPILER_VERSION"
+fi
+
+echo "    MPI         : $MPI/$MPI_VERSION"
+echo "    Build type  : $BUILD_TYPE"
+echo "    Jobs        : $JOBS"
+echo
+
+echo "Installation:"
+echo "    $INSTALL"
+echo
+
+echo "Module:"
+echo "    $MODULES/MPI/$COMPILER/$COMPILER_VERSION/$MPI/$MPI_VERSION/$NAME/$VERSION.lua"
+echo
+
+echo "Module-only:"
+echo "    $MODULE_ONLY"
+echo
 
 if ! $MODULE_ONLY; then
 
-    if already_installed pw.x; then
+    ##########################################################################
+    # Existing installation
+    ##########################################################################
 
-        echo "Quantum ESPRESSO $VERSION already installed."
+    if installed "$INSTALL/bin/pw.x" && ! $FORCE; then
+
+        echo "Quantum ESPRESSO $VERSION is already installed."
+        echo "Use --force to rebuild."
 
     else
 
+        ######################################################################
+        # Force rebuild
+        ######################################################################
+
         if $FORCE; then
+            echo "Force enabled."
+            echo "Removing existing installation:"
+            echo "    $INSTALL"
             rm -rf "$INSTALL"
         fi
 
@@ -129,6 +214,7 @@ if ! $MODULE_ONLY; then
 
         echo
         echo "Downloading Quantum ESPRESSO..."
+        echo "    $URL"
 
         download "$URL" "$ARCHIVE"
 
@@ -141,21 +227,35 @@ if ! $MODULE_ONLY; then
 
         extract "$ARCHIVE" "q-e-qe-$VERSION"
 
-        QE_SRC=$(find "$SRC" -maxdepth 1 -type d -name "q-e-qe-$VERSION*" | head -n1)
+        QE_SRC="$(
+            find "$SRC" \
+                -maxdepth 1 \
+                -type d \
+                -name "q-e-qe-$VERSION*" \
+                | head -n1
+        )"
+
         if [[ -z "$QE_SRC" ]]; then
-            echo "Error: Could not locate the extracted Quantum ESPRESSO source directory."
+            echo
+            echo "ERROR: Could not locate the extracted Quantum ESPRESSO"
+            echo "source directory."
             exit 1
         fi
 
-        echo "Using source directory: $QE_SRC"        
+        echo "Using source directory:"
+        echo "    $QE_SRC"
+
         ######################################################################
         # Build directory
         ######################################################################
 
-        echo "Building directories"
-        rm -rf "$BUILD/qe-$VERSION"
-        mkdir -p "$BUILD/qe-$VERSION"
-        cd "$BUILD/qe-$VERSION"
+        echo
+        echo "Preparing build directory..."
+
+        rm -rf "$BUILD_DIR"
+        mkdir -p "$BUILD_DIR"
+
+        cd "$BUILD_DIR"
 
         ######################################################################
         # Configure
@@ -172,10 +272,12 @@ if ! $MODULE_ONLY; then
             -DCMAKE_Fortran_COMPILER="$MPIFC"
 
             -DCMAKE_PREFIX_PATH="$OPENBLAS_ROOT;$FFTW_ROOT;$SCALAPACK_ROOT"
+
             -DLIBXC_ROOT="$LIBXC_ROOT"
             -DHDF5_ROOT="$HDF5_ROOT"
+
             ##################################################################
-            # Edit these if necessary
+            # QE features
             ##################################################################
 
             -DQE_ENABLE_MPI=ON
@@ -184,8 +286,6 @@ if ! $MODULE_ONLY; then
             -DQE_ENABLE_SCALAPACK=ON
             -DQE_ENABLE_HDF5=ON
             -DQE_ENABLE_LIBXC=ON
-
-            ##################################################################
         )
 
         ######################################################################
@@ -198,22 +298,9 @@ if ! $MODULE_ONLY; then
             echo "GPU build enabled."
 
             CMAKE_ARGS+=(
-
-                ##############################################################
-                # EDIT THESE FOR YOUR SYSTEM
-                ##############################################################
-
                 -DQE_ENABLE_CUDA=ON
                 -DCMAKE_CUDA_ARCHITECTURES="$CUDA_ARCHITECTURES"
                 -DCMAKE_CUDA_COMPILER="$(command -v nvcc)"
-                # Example:
-                #
-                # -DCMAKE_CUDA_ARCHITECTURES=80
-                #
-                # -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc
-                #
-                ##############################################################
-
             )
 
         fi
@@ -222,12 +309,19 @@ if ! $MODULE_ONLY; then
         # Run CMake
         ######################################################################
 
+        echo
         echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH"
+
         pkg-config --modversion libxc
         pkg-config --libs libxc
         pkg-config --cflags libxc
+
+        echo
+        echo "Running CMake..."
+
         cmake "${CMAKE_ARGS[@]}" \
             "$QE_SRC"
+
         ######################################################################
         # Build
         ######################################################################
@@ -244,7 +338,7 @@ if ! $MODULE_ONLY; then
         echo
         echo "Installing..."
 
-        cmake --install .``
+        cmake --install .
 
     fi
 
@@ -258,6 +352,10 @@ if ! installed "$INSTALL/bin/pw.x"; then
 
     echo
     echo "ERROR: Quantum ESPRESSO installation failed."
+    echo
+    echo "Expected executable:"
+    echo "    $INSTALL/bin/pw.x"
+    echo
 
     exit 1
 
@@ -267,7 +365,8 @@ fi
 # Module
 ##############################################################################
 
-# write_module mpi "$NAME" "$VERSION" "$INSTALL"
+echo
+echo "Generating module..."
 
 write_module \
     mpi \
@@ -293,14 +392,31 @@ echo " Quantum ESPRESSO $VERSION"
 echo "============================================================="
 echo
 
+if $GPU; then
+    echo "Build:"
+    echo "    GPU / CUDA"
+else
+    echo "Build:"
+    echo "    CPU"
+fi
+
+echo
+echo "Compiler:"
+echo "    $COMPILER/$COMPILER_VERSION"
+
+echo
+echo "MPI:"
+echo "    $MPI/$MPI_VERSION"
+
+echo
 echo "Installation:"
 echo "    $INSTALL"
-echo
 
+echo
 echo "Module:"
 echo "    $MODULES/MPI/$COMPILER/$COMPILER_VERSION/$MPI/$MPI_VERSION/$NAME/$VERSION.lua"
-echo
 
+echo
 echo "Executables:"
 echo "    pw.x"
 echo "    ph.x"
@@ -308,6 +424,6 @@ echo "    bands.x"
 echo "    dos.x"
 echo "    projwfc.x"
 echo "    pp.x"
-echo
 
+echo
 echo "Done."
