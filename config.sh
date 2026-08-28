@@ -933,10 +933,31 @@ write_module() {
 
     local dependencies=("$@")
 
+    #All module files should prepend the root/bin directory to PATH. 
+    #But if the module file is for a package that has a root_path, then prepend the root path instead of root/bin. 
+    #This is useful for packages like Orca that have executables in the root path.
+    #--Select if "bin" or "root" path mode is used based on the last argument in dependencies 
+    #--and strip it from the dependencies array if it is "root_path".
+    local path_mode="bin"
+    local path_code=""
+
+    if [[ "${dependencies[-1]:-}" == "root_path" ]]; then
+        path_mode="root"
+        unset 'dependencies[-1]'
+    fi
+
+    #--Set path_code based on the path_mode
+    if [[ "$path_mode" == "root" ]]; then
+        path_code='prepend_path("PATH", root)'
+    else
+        path_code='prepend_path("PATH", pathJoin(root, "bin"))'
+    fi
+    #__________________________
 
     local module_dir
     local hierarchy=""
     local dependency_code=""
+
 
 
     for dep in "${dependencies[@]}"; do
@@ -944,6 +965,7 @@ write_module() {
         dependency_code+="depends_on(\"$dep\")"$'\n'
 
     done
+
 
 
     case "$level" in
@@ -1023,7 +1045,7 @@ $dependency_code
 
 $extra
 
-prepend_path("PATH", pathJoin(root, "bin"))
+$path_code
 
 if isDir(pathJoin(root, "lib")) then
     prepend_path("LD_LIBRARY_PATH", pathJoin(root, "lib"))
