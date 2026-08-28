@@ -1,29 +1,20 @@
 #!/usr/bin/env bash
 
 ##############################################################################
-#
-# USAGE:
-#
-# ./14-orca.sh
-#
-# Installs ORCA.
-#
-# ./14-orca.sh --force
-#
-# Reinstalls ORCA even if already installed.
-#
-# ./14-orca.sh --module-only
-#
-# Creates the module without reinstalling ORCA.
-#
-##############################################################################
-#
 # ORCA Installer
 #
-# Installs the precompiled ORCA package using the common HPC build framework.
+# Installs the official ORCA binary distribution.
 #
-# Unlike source-built packages, ORCA is distributed as a licensed binary
-# archive and therefore must be downloaded manually.
+# Features
+#
+# • Uses the official precompiled ORCA binary
+# • AVX2 build
+# • OpenMPI 4.1.8
+# • Supports --force
+# • Supports --module-only
+# • Supports --version
+# • Supports --prefix
+# • Generates an Lmod module
 #
 ##############################################################################
 
@@ -31,52 +22,48 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../config.sh"
-source "$SCRIPT_DIR/../reports.sh"
-
-# source "$(dirname "$0")/config.sh"
-# source "$(dirname "$0")/reports.sh"
 
 parse_build_args "$@"
 
+##############################################################################
+# Toolchain
+##############################################################################
+
+COMPILER="gcc"
+
+select_toolchain
+load_toolchain 4.1.8
 
 ##############################################################################
 # Package information
 ##############################################################################
 
 NAME="orca"
-VERSION="$ORCA_VERSION"
+ORCA_VERSION="6.1.1"
 
+VERSION="${VERSION_OVERRIDE:-$ORCA_VERSION}"
 INSTALL="$(install_dir "$NAME" "$VERSION")"
 
-ARCHIVE="orca_6_1_1_linux_x86-64_shared_openmpi418_avx2.tar.xz"
-
-ARCHIVE_PATH="$DOWNLOADS/orca/$ARCHIVE"
-
-MPI_VERSION="4.1.8"
-
+ARCHIVE="orca_6_1_1_linux_x86-64_shared_openmpi418_avx2.run"
+ARCHIVE_PATH="$DOWNLOAD/$ARCHIVE"
 
 ##############################################################################
 # Prerequisites
 ##############################################################################
 
-echo "Checking dependencies..."
-
-require tar
+require "$MPIRUN"
 
 if [[ ! -f "$ARCHIVE_PATH" ]]; then
 
     echo
-    echo "ERROR: ORCA archive not found:"
-    echo
+    echo "ERROR: ORCA installer not found:"
     echo "    $ARCHIVE_PATH"
     echo
-    echo "ORCA must be downloaded manually from the ORCA Forum."
-    echo
-
+    echo "Download the official ORCA installer into:"
+    echo "    $DOWNLOAD"
     exit 1
 
 fi
-
 
 ##############################################################################
 # Build / Install
@@ -84,59 +71,57 @@ fi
 
 if ! $MODULE_ONLY; then
 
-    if already_installed "$INSTALL/bin/orca"; then
+    if installed "$INSTALL/orca" && ! $FORCE; then
 
         echo "ORCA $VERSION already installed."
 
+    else
+
         if $FORCE; then
             rm -rf "$INSTALL"
-        else
-            echo "Use --force to reinstall."
         fi
 
-    fi
-
-    if ! already_installed "$INSTALL/bin/orca"; then
-
-        ######################################################################
-        # Extract
-        ######################################################################
-
         echo
-        echo "Extracting ORCA..."
-
-        extract "$ARCHIVE" "orca"
-
-        ######################################################################
-        # Locate extracted package
-        ######################################################################
-
-        ORCA_SRC=$(find "$SRC" \
-            -maxdepth 1 \
-            -type d \
-            -name "orca*" \
-            | head -n1)
-
-        if [[ -z "$ORCA_SRC" ]]; then
-            echo "Error: Could not locate extracted ORCA directory."
-            exit 1
-        fi
-
-        ######################################################################
-        # Install
-        ######################################################################
-
+        echo "Installing ORCA $VERSION..."
         echo
-        echo "Installing ORCA..."
+        echo "Archive:"
+        echo "    $ARCHIVE_PATH"
+        echo
+        echo "Installation:"
+        echo "    $INSTALL"
+        echo
 
         mkdir -p "$(dirname "$INSTALL")"
 
-        mv "$ORCA_SRC" "$INSTALL"
+        ######################################################################
+        # Prevent the ORCA installer from modifying the user's shell startup
+        # files.
+        ######################################################################
+
+        TMP_HOME="$(mktemp -d)"
+
+        trap 'rm -rf "$TMP_HOME"' EXIT
+
+        ######################################################################
+        # Run official ORCA installer
+        ######################################################################
+
+        HOME="$TMP_HOME" \
+            "$ARCHIVE_PATH" \
+            --accept \
+            -- \
+            -p "$INSTALL"
+
+        ######################################################################
+        # Cleanup
+        ######################################################################
+
+        rm -rf "$TMP_HOME"
+        trap - EXIT
 
     fi
 
 fi
-
 
 ##############################################################################
 # Verify installation
@@ -150,7 +135,6 @@ if ! installed "$INSTALL/orca"; then
 
 fi
 
-
 ##############################################################################
 # Module
 ##############################################################################
@@ -161,17 +145,36 @@ write_module \
     "$VERSION" \
     "$INSTALL" \
     "" \
+    "$COMPILER/$COMPILER_VERSION" \
     "$MPI/$MPI_VERSION"
-
-
 ##############################################################################
 # Summary
 ##############################################################################
 
-summary \
-    "ORCA $VERSION" \
-    "Installation:" "$INSTALL" \
-    "Module:" "$MODULES/MPI/$MPI/$MPI_VERSION/$NAME/$VERSION.lua" \
-    "Executable:" "orca"
+echo
+echo "=============================================================="
+echo " ORCA $VERSION"
+echo "=============================================================="
+echo
+
+echo "Compiler:"
+echo "    $COMPILER/$COMPILER_VERSION"
+echo
+
+echo "MPI:"
+echo "    $MPI/$MPI_VERSION"
+echo
+
+echo "Installation:"
+echo "    $INSTALL"
+echo
+
+echo "Module:"
+echo "    $MODULES/Compiler/$COMPILER/$COMPILER_VERSION/$NAME/$VERSION.lua"
+echo
+
+echo "Executables:"
+echo "    orca"
+echo
 
 echo "Done."

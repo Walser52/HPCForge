@@ -12,11 +12,10 @@ if $GPU; then
 fi
 
 select_toolchain
-load_toolchain
+
 ##############################################################################
 # OpenMPI Installation
 ##############################################################################
-# Use --version to override the default version of OpenMPI to install.
 
 NAME="openmpi"
 
@@ -25,6 +24,9 @@ if [[ -n "$VERSION_OVERRIDE" ]]; then
 else
     VERSION="$MPI_VERSION"
 fi
+
+# Load the compiler and the requested OpenMPI version.
+load_toolchain "$VERSION"
 
 INSTALL="$(install_dir "$NAME" "$VERSION")"
 
@@ -36,10 +38,6 @@ INSTALL="$(install_dir "$NAME" "$VERSION")"
 require "$CC"
 require "$CXX"
 require "$FC"
-
-require "$MPICC"
-require "$MPICXX"
-require "$MPIFC"
 
 require make
 
