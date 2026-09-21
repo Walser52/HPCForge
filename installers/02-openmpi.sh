@@ -82,7 +82,9 @@ if ! $MODULE_ONLY; then
         CXX="$CXX" \
         FC="$FC" \
         "$SRC/openmpi-$VERSION/configure" \
-            --prefix="$INSTALL"
+            --prefix="$INSTALL" \
+            --with-hwloc=internal \
+            --with-libevent=internal
 
         echo
         echo "Building..."

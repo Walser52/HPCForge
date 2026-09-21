@@ -12,8 +12,9 @@ usage() {
 VERSION="$1"
 TARGET="${2,,}"
 
+source "$(dirname "${BASH_SOURCE[0]}")/../config.sh" #Get Modules path from config.sh
 module purge
-module use /mnt/software/modules/Core
+module use "$MODULES/Core" 
 
 case "$TARGET" in
     gpu)

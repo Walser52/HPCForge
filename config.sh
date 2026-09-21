@@ -425,8 +425,23 @@ require_gpu() {
 select_toolchain() {
 
     ##########################################################################
-    # GPU builds use NVHPC.
-    # CPU builds use GCC.
+    # Check if GPU builds are requested. If so, use the NVIDIA HPC SDK toolchain.
+    # If not, use the GCC toolchain.
+    #   GPU builds use NVHPC. 
+    #   CPU builds use GCC.
+    #
+    # This function sets the following variables:
+    #   COMPILER                (gcc or nvhpc)
+    #   COMPILER_VERSION        (version of the selected compiler)
+    #   MPI                     (openmpi or hpcx)
+    #   MPI_VERSION             (version of the selected MPI)
+    #   TOOLCHAIN               (installation prefix for the selected compiler)
+    #   MPI_ROOT                (installation prefix for the selected MPI)
+    #   OPENBLAS_ROOT           (installation prefix for OpenBLAS)
+    #   FFTW_ROOT               (installation prefix for FFTW)
+    #   LIBXC_ROOT              (installation prefix for Libxc)
+    #   HDF5_ROOT               (installation prefix for HDF5)
+    #   SCALAPACK_ROOT          (installation prefix for ScaLAPACK)
     ##########################################################################
 
     if $GPU; then
@@ -510,6 +525,21 @@ load_toolchain() {
     #     load_toolchain
     #     load_toolchain 4.1.8
     #
+    # Purpose:  This function loads the selected compiler and MPI toolchain into the environment.
+    #           Uses the module system to load the appropriate compiler and MPI modules.
+    #
+    # If MPI_VERSION is provided, it will load that specific version of MPI. 
+    # Otherwise, it will load the default version specified in config.sh.
+    #
+    # If COMPILER is set to "nvhpc", it will load the NVIDIA HPC SDK and HPC-X modules.
+    # If COMPILER is set to "gcc", 
+    #       It will load the GCC and OpenMPI modules.
+    #       If GPU is true, it will also load the CUDA module.
+    #
+    # After loading the modules, it sets the following environment variables:
+    #   CC, CXX, FC:  Compiler executables
+    #   MPICC, MPICXX, MPIFC:  MPI compiler wrappers
+    #   MPIRUN:  MPI run command
     ##########################################################################
 
     local requested_mpi="${1:-$MPI_VERSION}"

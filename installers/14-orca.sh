@@ -148,24 +148,6 @@ write_module \
     'family("orca")' \
     "root_path" #special argument to prepend root to PATH instead of root/bin
 
-# write_module \
-#     mpi \
-#     "$NAME" \
-#     "$VERSION" \
-#     "$INSTALL" \
-#     'family("orca")' \
-#     "gcc/$COMPILER_VERSION" \
-#     "openmpi/$MPI_VERSION" \
-#     "root_path" #special argument to prepend root to PATH instead of root/bin
-
-# write_module \
-#     mpi \
-#     "$NAME" \
-#     "$VERSION" \
-#     "$INSTALL" \
-#     "" \
-#     "$COMPILER/$COMPILER_VERSION" \
-#     "$MPI/$MPI_VERSION"
 ##############################################################################
 # Summary
 ##############################################################################

@@ -1,4 +1,3 @@
-```bash
 #!/usr/bin/env bash
 
 ##############################################################################
@@ -16,18 +15,14 @@
 #
 # Builds unfold.x against an existing CPU Quantum ESPRESSO installation.
 #
-# The required toolchain is inherited from the QE module hierarchy:
-#
-#     gcc/<version>
-#         openmpi/<version>
-#             qe/<QE_VERSION>
-#                 unfold-x/<UNFOLD_VERSION>
-#
-# unfold.x is intentionally CPU-only.
+# unfold.x uses the QE build system directly through QE_ROOT. The QE module
+# therefore supplies the compiler, MPI, libraries, include files, and
+# make.inc required to build unfold.x.
 #
 # Features
 #
 # • Builds against an existing QE installation
+# • CPU-only
 # • Supports --force
 # • Supports --module-only
 # • Supports --version
@@ -36,13 +31,14 @@
 #
 ##############################################################################
 
-# set -euo pipefail
+set -euo pipefail
 
 ##############################################################################
 # Configuration
 ##############################################################################
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
 source "$SCRIPT_DIR/../config.sh"
 
 parse_build_args "$@"
@@ -54,49 +50,38 @@ parse_build_args "$@"
 NAME="unfold-x"
 
 #
-# IMPORTANT:
+# Version of unfold-x itself.
 #
-# UNFOLD_VERSION is the version of unfold-x itself.
+# Set this in config.sh, for example:
 #
-# QE_VERSION_TARGET is the version of QE against which unfold.x is compiled.
+#     UNFOLD_X_VERSION="..."
 #
-# For now, unfold-x is treated as a single source version and the QE version
-# is selected with --version.
+# The --version argument refers to the QE version against which unfold.x
+# is compiled.
 #
 
-UNFOLD_VERSION="${UNFOLD_X_VERSION:-master}"
+
+#
+# Unfold-X tracks the current master branch.
+#
+UNFOLD_VERSION="master"
+
 QE_VERSION_TARGET="${VERSION_OVERRIDE:-$QE_VERSION}"
-
 ##############################################################################
 # CPU toolchain
 ##############################################################################
 
+GPU=false
 COMPILER="gcc"
 
-select_toolchain
-load_toolchain
+select_toolchain    #GPU = False; COMPILER="gcc" => MPI="openmpi" (whichever version is set by config.sh)
+load_toolchain      #Load the toolchain modules (gcc and openmpi)
 
 ##############################################################################
-# QE dependency
-##############################################################################
-
-load_dependencies openblas fftw scalapack libxc hdf5
-
-##############################################################################
-# Prerequisites
-##############################################################################
-
-require "$MPICC"
-require "$MPIFC"
-require make
-require git
-
-##############################################################################
-# Locate the QE installation
+# Quantum ESPRESSO
 ##############################################################################
 #
-# We deliberately load QE through the module hierarchy rather than attempting
-# to reconstruct its installation path ourselves.
+# unfold.x must be compiled against the CPU build of QE.
 #
 ##############################################################################
 
@@ -105,44 +90,67 @@ echo "Loading Quantum ESPRESSO $QE_VERSION_TARGET..."
 
 module load "qe/$QE_VERSION_TARGET"
 
-QE_ROOT="$(dirname "$(dirname "$(command -v pw.x)")")"
+##############################################################################
+# Locate QE
+##############################################################################
 
-if [[ ! -d "$QE_ROOT" ]]; then
+PW_X="$(command -v pw.x || true)"
+
+if [[ -z "$PW_X" ]]; then
     echo
-    echo "ERROR: Could not determine QE installation."
+    echo "ERROR: pw.x was not found after loading qe/$QE_VERSION_TARGET."
     echo
     exit 1
 fi
 
-if [[ ! -x "$QE_ROOT/bin/pw.x" ]]; then
+QE_ROOT="$(cd -- "$(dirname -- "$(dirname -- "$PW_X")")" && pwd)"
+
+if [[ ! -f "$QE_ROOT/make.inc" ]]; then
     echo
-    echo "ERROR: QE installation does not contain pw.x:"
-    echo "    $QE_ROOT"
+    echo "ERROR: QE make.inc was not found:"
+    echo "    $QE_ROOT/make.inc"
     echo
     exit 1
 fi
 
-echo "QE installation:"
-echo "    $QE_ROOT"
+if [[ ! -f "$QE_ROOT/PW/src/libpw.a" ]]; then
+    echo
+    echo "ERROR: QE PW library was not found:"
+    echo "    $QE_ROOT/PW/src/libpw.a"
+    echo
+    exit 1
+fi
 
 ##############################################################################
-# Package source
+# Source
 ##############################################################################
 
 REPOSITORY="https://bitbucket.org/bonfus/unfold-x.git"
 
 SOURCE_DIR="$SRC/unfold-x"
 
-BUILD_DIR="$BUILD/unfold-x"
+##############################################################################
+# Installation
+##############################################################################
+#
+# Keep the user-facing module name as:
+#
+#     unfold-x/<version>
+#
+# The module belongs to the CPU QE hierarchy and depends on the selected
+# QE version.
+#
+# Physical installations are separated by QE version because unfold.x is
+# compiled directly against QE's libraries.
+#
+##############################################################################
 
-#
-# The installed module is tied to the QE version because unfold.x is compiled
-# against that QE installation.
-#
-INSTALL="$(install_dir "$NAME" "$UNFOLD_VERSION")/$COMPILER/$COMPILER_VERSION/$MPI/$MPI_VERSION/qe/$QE_VERSION_TARGET"
+INSTALL="$(
+    install_dir "$NAME" "$UNFOLD_VERSION"
+)/$COMPILER/$COMPILER_VERSION/$MPI/$MPI_VERSION/qe/$QE_VERSION_TARGET"
 
 ##############################################################################
-# Existing installation
+# Summary
 ##############################################################################
 
 echo
@@ -157,6 +165,10 @@ echo "    $UNFOLD_VERSION"
 echo
 echo "Quantum ESPRESSO:"
 echo "    $QE_VERSION_TARGET"
+
+echo
+echo "QE root:"
+echo "    $QE_ROOT"
 
 echo
 echo "Compiler:"
@@ -180,6 +192,10 @@ echo "    $MODULES/MPI/$COMPILER/$COMPILER_VERSION/$MPI/$MPI_VERSION/$NAME/$UNFO
 
 if ! $MODULE_ONLY; then
 
+    ##########################################################################
+    # Existing installation
+    ##########################################################################
+
     if installed "$INSTALL/bin/unfold.x" && ! $FORCE; then
 
         echo
@@ -193,16 +209,18 @@ if ! $MODULE_ONLY; then
         ######################################################################
 
         if $FORCE; then
+
             echo
             echo "Force enabled."
             echo "Removing existing installation:"
             echo "    $INSTALL"
 
             rm -rf "$INSTALL"
+
         fi
 
         ######################################################################
-        # Source
+        # Obtain source
         ######################################################################
 
         echo
@@ -215,34 +233,31 @@ if ! $MODULE_ONLY; then
 
             cd "$SOURCE_DIR"
 
-            git fetch --all
+            git fetch origin master
             git reset --hard origin/master
-
+            git clean -fdx
         else
 
             rm -rf "$SOURCE_DIR"
 
-            git clone "$REPOSITORY" "$SOURCE_DIR"
+            git clone --branch master "$REPOSITORY" "$SOURCE_DIR"
 
         fi
-
-        ######################################################################
-        # Build directory
-        ######################################################################
-
-        echo
-        echo "Preparing build directory..."
-
-        rm -rf "$BUILD_DIR"
-        mkdir -p "$BUILD_DIR"
 
         ######################################################################
         # Build
         ######################################################################
 
         echo
-        echo "Building unfold.x against:"
-        echo "    QE_ROOT=$QE_ROOT"
+        echo "Building unfold.x..."
+
+        echo
+        echo "Source:"
+        echo "    $SOURCE_DIR"
+
+        echo
+        echo "QE_ROOT:"
+        echo "    $QE_ROOT"
 
         cd "$SOURCE_DIR"
 
@@ -254,11 +269,15 @@ if ! $MODULE_ONLY; then
         # Verify build
         ######################################################################
 
-        if [[ ! -x "$SOURCE_DIR/src/unfold.x" ]]; then
+        if [[ ! -x "$SOURCE_DIR/bin/unfold.x" ]]; then
 
             echo
             echo "ERROR: unfold.x was not produced."
             echo
+            echo "Expected:"
+            echo "    $SOURCE_DIR/bin/unfold.x"
+            echo
+
             exit 1
 
         fi
@@ -272,8 +291,21 @@ if ! $MODULE_ONLY; then
 
         mkdir -p "$INSTALL/bin"
 
-        cp "$SOURCE_DIR/src/unfold.x" \
+        cp -L \
+            "$SOURCE_DIR/bin/unfold.x" \
             "$INSTALL/bin/unfold.x"
+
+        #
+        # Install unklist.x as well because the unfold-x build produces it.
+        #
+
+        if [[ -x "$SOURCE_DIR/bin/unklist.x" ]]; then
+
+            cp -L \
+                "$SOURCE_DIR/bin/unklist.x" \
+                "$INSTALL/bin/unklist.x"
+
+        fi
 
     fi
 
@@ -339,6 +371,10 @@ echo "MPI:"
 echo "    $MPI/$MPI_VERSION"
 
 echo
+echo "QE root:"
+echo "    $QE_ROOT"
+
+echo
 echo "Installation:"
 echo "    $INSTALL"
 
@@ -347,9 +383,9 @@ echo "Module:"
 echo "    $MODULES/MPI/$COMPILER/$COMPILER_VERSION/$MPI/$MPI_VERSION/$NAME/$UNFOLD_VERSION.lua"
 
 echo
-echo "Executable:"
+echo "Executables:"
 echo "    unfold.x"
+echo "    unklist.x"
 
 echo
 echo "Done."
-```

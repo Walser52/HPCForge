@@ -4,6 +4,12 @@ A lightweight build framework for installing scientific software from source int
 
 The project was developed to build Quantum ESPRESSO and its dependencies, but it is designed to be easily extended to additional HPC packages such as Wannier90, Yambo, ELPA, PETSc, and others.
 
+# Quick help / Examples
+
+## Openmpi
+    ```
+    ./installers/02-openmpi.sh --version 4.1.8 --force
+    ```
 # Directory Layout
 
 ```

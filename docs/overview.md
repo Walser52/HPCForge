@@ -976,3 +976,32 @@ The desired dependency chain is therefore:
 The system should remain understandable even after dozens of applications have been added.
 
 ---
+
+
+# 24. Typical Installer Structure
+
+15-lammps.sh
+│
+├── Parse arguments
+│
+├── Select toolchain
+│   ├── CPU → GCC + OpenMPI
+│   └── GPU → NVHPC + HPC-X   [placeholder initially]
+│
+├── Define LAMMPS package set
+│   ├── GENERAL_PACKAGES
+│   ├── MATERIALS_PACKAGES
+│   ├── ML_PACKAGES
+│   └── GPU_PACKAGES         
+│
+├── Load dependencies
+│
+├── Configure CMake
+│   ├── common options
+│   ├── CPU options
+│   └── GPU options           
+│
+├── Build
+├── Install
+├── Verify
+└── Generate Lmod module
