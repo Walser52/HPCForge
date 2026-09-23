@@ -422,6 +422,17 @@ require_gpu() {
 # Toolchain selection
 ##############################################################################
 
+set_COMPILER_nvhpc_gcc(){
+    local gpu_flag="$1"
+
+    if $gpu_flag; then
+        COMPILER="nvhpc"
+
+    else
+        COMPILER="gcc"
+    fi
+}
+
 select_toolchain() {
 
     ##########################################################################
@@ -1164,4 +1175,60 @@ validate_gpu_configuration() {
         exit 1
 
     fi
+}
+
+
+
+
+
+summary() {
+    # Prints a summary of the build configuration and installation details.
+    # Usage:
+    #  summary NAME EXECUTABLES...
+    # Example: 
+    #    EXECUTABLES=( "pw.x" "ph.x")
+    #    summary "Quantum Espresso" "${EXECUTABLES[@]}"
+
+    local NAME="$1"
+    shift
+    local EXECUTABLES=("$@")
+
+    echo
+    echo "============================================================="
+    echo " $NAME $VERSION"
+    echo "============================================================="
+    echo
+
+    if $GPU; then
+        echo "Build:"
+        echo "    GPU / CUDA"
+    else
+        echo "Build:"
+        echo "    CPU"
+    fi
+
+    echo
+    echo "Compiler:"
+    echo "    $COMPILER/$COMPILER_VERSION"
+
+    echo
+    echo "MPI:"
+    echo "    $MPI/$MPI_VERSION"
+
+    echo
+    echo "Installation:"
+    echo "    $INSTALL"
+
+    echo
+    echo "Module:"
+    echo "    $MODULES/MPI/$COMPILER/$COMPILER_VERSION/$MPI/$MPI_VERSION/$NAME/$VERSION.lua"
+
+    echo
+    echo "Executable:"
+    # echo "    lmp"
+    for exe in "${EXECUTABLES[@]}"; do
+        echo "    $exe"
+    done
+
+    echo "Done."
 }

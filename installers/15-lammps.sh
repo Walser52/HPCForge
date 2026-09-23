@@ -116,16 +116,7 @@ LAMMPS_GPU_PACKAGES=(
 # Toolchain
 ##############################################################################
 
-if $GPU; then
-
-    COMPILER="nvhpc"
-
-else
-
-    COMPILER="gcc"
-
-fi
-
+set_COMPILER_nvhpc_gcc $GPU
 select_toolchain
 load_toolchain
 
@@ -201,7 +192,7 @@ BASE_INSTALL="$(install_dir "$NAME" "$VERSION")"
 
 INSTALL="$BASE_INSTALL/$COMPILER/$COMPILER_VERSION/$MPI/$MPI_VERSION"
 
-BUILD_DIR="$BUILD/lammps-$VERSION-$COMPILER-$COMPILER_VERSION-$MPI-$MPI_VERSION"
+BUILD_DIR="$BUILD/$NAME-$VERSION-$COMPILER-$COMPILER_VERSION-$MPI-$MPI_VERSION"
 
 
 
@@ -511,9 +502,9 @@ echo
 echo "LAMMPS executable:"
 echo "    $INSTALL/bin/lmp"
 
-echo
-echo "LAMMPS version:"
-"$INSTALL/bin/lmp" -help | head -n 5
+# echo
+# echo "LAMMPS version:"
+# "$INSTALL/bin/lmp" -help
 
 
 ##############################################################################
@@ -531,3 +522,21 @@ write_module \
     "" \
     "$COMPILER/$COMPILER_VERSION" \
     "$MPI/$MPI_VERSION"
+
+##############################################################################
+# Summary
+##############################################################################
+
+
+EXECUTABLES=("lmp")
+summary "LAMMPS" "${EXECUTABLES[@]}"
+
+echo
+echo "Packages:"
+for package in \
+    "${LAMMPS_GENERAL_PACKAGES[@]}" \
+    "${LAMMPS_MATERIALS_PACKAGES[@]}" \
+    "${LAMMPS_ML_PACKAGES[@]}"
+do
+    echo "    $package"
+done
