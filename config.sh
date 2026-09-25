@@ -974,18 +974,32 @@ write_module() {
 
     local dependencies=("$@")
 
+    local path_mode="bin"
+    local path_code=""
+
+    if (( ${#dependencies[@]} > 0 )); then
+        local last_dependency="${dependencies[-1]}"
+
+        if [[ "$last_dependency" == "root_path" ]]; then
+            path_mode="root"
+            unset 'dependencies[-1]'
+        fi
+    fi
+
+    # local dependencies=("$@")
+
     #All module files should prepend the root/bin directory to PATH. 
     #But if the module file is for a package that has a root_path, then prepend the root path instead of root/bin. 
     #This is useful for packages like Orca that have executables in the root path.
     #--Select if "bin" or "root" path mode is used based on the last argument in dependencies 
     #--and strip it from the dependencies array if it is "root_path".
-    local path_mode="bin"
-    local path_code=""
+    # local path_mode="bin"
+    # local path_code=""
 
-    if [[ "${dependencies[-1]:-}" == "root_path" ]]; then
-        path_mode="root"
-        unset 'dependencies[-1]'
-    fi
+    # if [[ "${dependencies[-1]:-}" == "root_path" ]]; then
+    #     path_mode="root"
+    #     unset 'dependencies[-1]'
+    # fi
 
     #--Set path_code based on the path_mode
     if [[ "$path_mode" == "root" ]]; then

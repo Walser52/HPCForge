@@ -129,6 +129,13 @@ require "$MPICC"
 require "$MPICXX"
 require cmake
 require make
+require tar
+
+if $GPU; then
+
+    validate_gpu_configuration
+
+fi
 
 
 ##############################################################################
@@ -163,18 +170,7 @@ do
 done
 
 
-##############################################################################
-# GPU package configuration
-##############################################################################
-
 if $GPU; then
-
-    #
-    # GPU support is intentionally left as a separate block.
-    #
-    # The exact CUDA/KOKKOS configuration will be added once the CPU build
-    # is verified.
-    #
 
     for package in "${LAMMPS_GPU_PACKAGES[@]}"; do
 
@@ -184,16 +180,54 @@ if $GPU; then
 
 fi
 
+
+if $GPU; then
+
+    echo
+    echo "GPU build requested."
+
+    validate_gpu_configuration
+
+    CMAKE_ARGS+=(
+        ######################################################################
+        # CUDA
+        ######################################################################
+
+        -DCMAKE_CUDA_COMPILER="$CUDA_HOME/bin/nvcc"
+        -DCMAKE_CUDA_ARCHITECTURES="$CUDA_ARCHITECTURES"
+
+        ######################################################################
+        # KOKKOS
+        ######################################################################
+
+        -DKokkos_ENABLE_CUDA=ON
+        -DKokkos_ENABLE_OPENMP=ON
+
+        -DKokkos_ARCH_SKX=ON
+        -DKokkos_ARCH_VOLTA70=ON
+
+        ######################################################################
+        # CUDA FFT
+        ######################################################################
+
+        -DFFT_KOKKOS=CUFFT
+    )
+
+fi
 ##############################################################################
 # Installation
 ##############################################################################
 
 BASE_INSTALL="$(install_dir "$NAME" "$VERSION")"
-
 INSTALL="$BASE_INSTALL/$COMPILER/$COMPILER_VERSION/$MPI/$MPI_VERSION"
 
-BUILD_DIR="$BUILD/$NAME-$VERSION-$COMPILER-$COMPILER_VERSION-$MPI-$MPI_VERSION"
+if $GPU; then
+    ACCELERATOR="cuda"
+else
+    ACCELERATOR="cpu"
+fi
 
+BUILD_DIR="$BUILD/lammps-$VERSION-$ACCELERATOR-$COMPILER-$COMPILER_VERSION-$MPI-$MPI_VERSION"
 
 
 ##############################################################################

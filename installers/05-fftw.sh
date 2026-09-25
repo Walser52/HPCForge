@@ -10,6 +10,15 @@ select_toolchain
 load_toolchain
 
 ##############################################################################
+# Options
+##############################################################################
+
+# Build all FFTW precision variants by default.
+# true  = single + double + long double
+# false = double precision only
+FFTW_MIXED_PRECISION=true
+
+##############################################################################
 # FFTW Installation
 ##############################################################################
 
@@ -58,20 +67,87 @@ if ! $MODULE_ONLY; then
         echo
         echo "Configuring..."
 
+        CONFIGURE_OPTIONS=(
+            --prefix="$INSTALL"
+            --enable-shared
+            --enable-static
+            --enable-openmp
+        )
+
+        case "$FFTW_MIXED_PRECISION" in
+            true)
+                echo "FFTW precision: mixed (single + double + long double)"
+
+                # Build double precision
+                rm -rf "$BUILD/fftw-$VERSION"
+                mkdir -p "$BUILD/fftw-$VERSION"
+                cd "$BUILD/fftw-$VERSION"
+
+                "$SRC/fftw-$VERSION/configure" \
+                    "${CONFIGURE_OPTIONS[@]}" \
+                    CC="$CC" \
+                    FC="$FC"
+
+                make -j"$JOBS"
+                make install
+
+                # Build single precision
+                rm -rf "$BUILD/fftw-$VERSION"
+                mkdir -p "$BUILD/fftw-$VERSION"
+                cd "$BUILD/fftw-$VERSION"
+
+                "$SRC/fftw-$VERSION/configure" \
+                    "${CONFIGURE_OPTIONS[@]}" \
+                    --enable-float \
+                    CC="$CC" \
+                    FC="$FC"
+
+                make -j"$JOBS"
+                make install
+
+                # Build long double precision
+                rm -rf "$BUILD/fftw-$VERSION"
+                mkdir -p "$BUILD/fftw-$VERSION"
+                cd "$BUILD/fftw-$VERSION"
+
+                "$SRC/fftw-$VERSION/configure" \
+                    "${CONFIGURE_OPTIONS[@]}" \
+                    --enable-long-double \
+                    CC="$CC" \
+                    FC="$FC"
+
+                make -j"$JOBS"
+                make install
+                ;;
+
+            false)
+                echo "FFTW precision: double"
+
+                "$SRC/fftw-$VERSION/configure" \
+                    "${CONFIGURE_OPTIONS[@]}" \
+                    CC="$CC" \
+                    FC="$FC"
+
+                make -j"$JOBS"
+                make install
+                ;;
+
+            *)
+                echo "ERROR: FFTW_MIXED_PRECISION must be true or false."
+                exit 1
+                ;;
+        esac
+
         "$SRC/fftw-$VERSION/configure" \
-            --prefix="$INSTALL" \
-            --enable-shared \
-            --enable-static \
-            --enable-openmp \
+            "${CONFIGURE_OPTIONS[@]}" \
             CC="$CC" \
             FC="$FC"
 
         echo
         echo "Building..."
 
-        # make -j"$(nproc)"
         make -j"$JOBS"
-        
+
         echo
         echo "Installing..."
 
@@ -91,11 +167,24 @@ if ! installed "$INSTALL/lib/libfftw3.so"; then
     exit 1
 fi
 
+if [[ "$FFTW_MIXED_PRECISION" == true ]]; then
+
+    for lib in libfftw3f.so libfftw3l.so; do
+        if ! installed "$INSTALL/lib/$lib"; then
+            echo
+            echo "ERROR: Mixed-precision FFTW installation is missing $lib"
+            exit 1
+        fi
+    done
+
+fi
+
 ##############################################################################
 # Module
 ##############################################################################
 
-write_module compiler "$NAME" "$VERSION" "$INSTALL" ""
+# write_module compiler "$NAME" "$VERSION" "$INSTALL" ""
+write_module compiler "$NAME" "$VERSION" "$INSTALL"
 
 ##############################################################################
 # Summary
@@ -107,6 +196,14 @@ echo " FFTW $VERSION"
 echo "=============================================================="
 
 echo
+echo "Precision:"
+if [[ "$FFTW_MIXED_PRECISION" == true ]]; then
+    echo "  Mixed (single + double + long double)"
+else
+    echo "  Double"
+fi
+
+echo
 echo "Installation:"
 echo "  $INSTALL"
 
@@ -116,23 +213,3 @@ echo "  $MODULES/Compiler/$COMPILER/$COMPILER_VERSION/$NAME/$VERSION.lua"
 
 echo
 echo "Done."
-
-# Remarks
-# =========================================
-# FFTW actually comes in several variants:
-
-# double precision (libfftw3)
-# single precision (libfftw3f)
-# long double (libfftw3l)
-# MPI (libfftw3_mpi)
-# OpenMP (libfftw3_omp)
-
-# The script above builds the standard double-precision library with OpenMP support, which is sufficient for Quantum ESPRESSO.
-
-# A couple of choices I'd make:
-
-    # Build shared libraries (--enable-shared).
-    # Also build static libraries (--enable-static).
-    # Enable OpenMP support (--enable-openmp) so QE can take advantage of threaded FFTs.
-    # Install into your toolchain directory.
-    # Keep it as a compiler-level module.
