@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+
+import argparse
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Generate and submit a Slurm job."
+    )
+
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print the generated Slurm script without submitting",
+    )
+
+    return parser.parse_args()
+
+
+def generate_script(job):
+    lines = [
+        "#!/usr/bin/env bash",
+        "",
+    ]
+
+    # Slurm directives
+    if job.get("name"):
+        lines.append(f"#SBATCH --job-name={job['name']}")
+
+    resources = job.get("resources", {})
+
+    if resources.get("ntasks") is not None:
+        lines.append(f"#SBATCH --ntasks={resources['ntasks']}")
+
+    if resources.get("cpus_per_task") is not None:
+        lines.append(
+            f"#SBATCH --cpus-per-task={resources['cpus_per_task']}"
+        )
+
+    if resources.get("memory"):
+        lines.append(f"#SBATCH --mem={resources['memory']}")
+
+    if resources.get("time"):
+        lines.append(f"#SBATCH --time={resources['time']}")
+
+    if resources.get("partition"):
+        lines.append(
+            f"#SBATCH --partition={resources['partition']}"
+        )
+
+    lines.extend([
+        "",
+        "set -euo pipefail",
+        "",
+    ])
+
+    # Environment/setup commands
+    for command in job.get("setup", []):
+        lines.append(command)
+
+    lines.append("")
+
+    # Main command
+    lines.append(job["command"])
+
+    lines.append("")
+
+    return "\n".join(lines)
+
+
+def submit(script):
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        suffix=".slurm",
+        delete=False,
+    ) as f:
+        f.write(script)
+        script_path = Path(f.name)
+
+    try:
+        result = subprocess.run(
+            ["sbatch", str(script_path)],
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+
+        print(result.stdout.strip())
+
+    finally:
+        script_path.unlink(missing_ok=True)
+
+
+def main():
+    args = parse_args()
+
+    try:
+        import json
+
+        job = json.load(sys.stdin)
+
+        if "command" not in job:
+            raise ValueError("Job specification is missing 'command'")
+
+        script = generate_script(job)
+
+        if args.dry_run:
+            print(script)
+        else:
+            submit(script)
+
+    except json.JSONDecodeError as exc:
+        print(
+            f"runslurm: invalid JSON: {exc}",
+            file=sys.stderr,
+        )
+        return 1
+
+    except subprocess.CalledProcessError as exc:
+        print(
+            f"runslurm: sbatch failed:\n{exc.stderr}",
+            file=sys.stderr,
+        )
+        return 1
+
+    except (ValueError, KeyError) as exc:
+        print(
+            f"runslurm: error: {exc}",
+            file=sys.stderr,
+        )
+        return 1
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

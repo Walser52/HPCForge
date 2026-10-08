@@ -215,50 +215,62 @@ if [[ "$BUILD_GPU" == true ]]; then
 
 fi
 
-###############################################################################
-# Module files
-###############################################################################
+##############################################################################
+# Module
+##############################################################################
 
-create_module()
-{
-    local variant="$1"
-    local install="${APP_ROOT}/${VERSION}-${variant}"
-    local module="${MODULE_ROOT}/${VERSION}-${variant}.lua"
+echo
+echo "Generating module..."
 
-    cat > "$module" <<EOF
-help([[
-GROMACS ${VERSION} (${variant})
-]])
+write_module \
+    mpi \
+    "$NAME" \
+    "$VERSION" \
+    "$INSTALL" \
+    "" \
+    "$COMPILER/$COMPILER_VERSION" \
+    "$MPI/$MPI_VERSION"
+    
+# create_module()
+# {
+#     local variant="$1"
+#     local install="${APP_ROOT}/${VERSION}-${variant}"
+#     local module="${MODULE_ROOT}/${VERSION}-${variant}.lua"
 
-whatis("Name: GROMACS")
-whatis("Version: ${VERSION}")
-whatis("Variant: ${variant}")
-whatis("Description: GROMACS molecular dynamics package")
+#     cat > "$module" <<EOF
+# help([[
+# GROMACS ${VERSION} (${variant})
+# ]])
 
-local root = "${install}"
+# whatis("Name: GROMACS")
+# whatis("Version: ${VERSION}")
+# whatis("Variant: ${variant}")
+# whatis("Description: GROMACS molecular dynamics package")
 
-prepend_path("PATH", pathJoin(root, "bin"))
-prepend_path("LD_LIBRARY_PATH", pathJoin(root, "lib"))
-prepend_path("PKG_CONFIG_PATH", pathJoin(root, "lib", "pkgconfig"))
-prepend_path("CMAKE_PREFIX_PATH", root)
+# local root = "${install}"
 
-setenv("GMX_ROOT", root)
+# prepend_path("PATH", pathJoin(root, "bin"))
+# prepend_path("LD_LIBRARY_PATH", pathJoin(root, "lib"))
+# prepend_path("PKG_CONFIG_PATH", pathJoin(root, "lib", "pkgconfig"))
+# prepend_path("CMAKE_PREFIX_PATH", root)
 
-if isDir(pathJoin(root, "share", "gromacs")) then
-    setenv("GMXDATA", pathJoin(root, "share", "gromacs"))
-end
-EOF
+# setenv("GMX_ROOT", root)
 
-    echo "Created module: ${module}"
-}
+# if isDir(pathJoin(root, "share", "gromacs")) then
+#     setenv("GMXDATA", pathJoin(root, "share", "gromacs"))
+# end
+# EOF
 
-if [[ "$BUILD_CPU" == true ]]; then
-    create_module "cpu"
-fi
+#     echo "Created module: ${module}"
+# }
 
-if [[ "$BUILD_GPU" == true ]]; then
-    create_module "cuda"
-fi
+# if [[ "$BUILD_CPU" == true ]]; then
+#     create_module "cpu"
+# fi
+
+# if [[ "$BUILD_GPU" == true ]]; then
+#     create_module "cuda"
+# fi
 
 ###############################################################################
 # Done

@@ -139,6 +139,9 @@ fi
 # Module
 ##############################################################################
 
+##############################################################################
+# Module
+##############################################################################
 
 write_module \
     mpi \
@@ -146,7 +149,17 @@ write_module \
     "$VERSION" \
     "$INSTALL" \
     'family("orca")' \
-    "root_path" #special argument to prepend root to PATH instead of root/bin
+    "$COMPILER/$COMPILER_VERSION" \
+    "$MPI/$MPI_VERSION" \
+    root_path
+
+# write_module \
+#     mpi \
+#     "$NAME" \
+#     "$VERSION" \
+#     "$INSTALL" \
+#     'family("orca")' \
+#     "root_path" #special argument to prepend root to PATH instead of root/bin
 
 ##############################################################################
 # Summary

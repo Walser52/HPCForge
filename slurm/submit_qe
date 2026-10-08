@@ -1,0 +1,211 @@
+#!/usr/bin/env python3
+
+import argparse
+import json
+from pathlib import Path
+import subprocess
+import sys
+
+
+import yaml
+
+HPCFORGE_ROOT = Path(__file__).resolve().parent.parent
+CONFIG_FILE = HPCFORGE_ROOT / "config.sh"
+
+DEFAULTS = {
+    "version": "7.4",
+    "target": "cpu",
+    "resources": {
+        "ntasks": 8,
+        "memory": "32G",
+        "time": "01:00:00",
+    },
+}
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Submit a Quantum ESPRESSO job to Slurm."
+    )
+
+    parser.add_argument(
+        "yaml_file",
+        type=Path,
+        help="YAML job description",
+    )
+
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print the generated Slurm script without submitting",
+    )
+
+    parser.add_argument(
+        "--ntasks",
+        type=int,
+        help="Override number of tasks",
+    )
+
+    parser.add_argument(
+        "--memory",
+        help="Override memory request",
+    )
+
+    parser.add_argument(
+        "--time",
+        dest="walltime",
+        help="Override walltime",
+    )
+
+    return parser.parse_args()
+
+
+def load_job(path):
+    if not path.exists():
+        raise FileNotFoundError(f"Job file not found: {path}")
+
+    with path.open() as f:
+        job = yaml.safe_load(f)
+
+    if job is None:
+        job = {}
+
+    return job
+
+
+def merge_defaults(job):
+    result = {
+        "version": DEFAULTS["version"],
+        "target": DEFAULTS["target"],
+        "resources": DEFAULTS["resources"].copy(),
+    }
+
+    for key in ("name", "code", "input", "version", "target"):
+        if key in job:
+            result[key] = job[key]
+
+    if "resources" in job:
+        result["resources"].update(job["resources"])
+
+    return result
+
+
+def validate_job(job):
+    if "code" not in job:
+        raise ValueError("Missing required field: 'code'")
+
+    if "input" not in job:
+        raise ValueError("Missing required field: 'input'")
+
+    if job["code"] not in {"pw.x", "epw.x"}:
+        raise ValueError(
+            f"Unsupported QE code: {job['code']}. "
+            "Currently supported: pw.x, epw.x"
+        )
+
+    if job["target"] not in {"cpu", "gpu"}:
+        raise ValueError("target must be 'cpu' or 'gpu'")
+
+def build_module_commands(job):
+    version = job["version"]
+    target = job["target"]
+
+    setup = [
+        f'source "{CONFIG_FILE}"',
+        "module purge",
+        'module use "$MODULES/Core"',
+        "",
+    ]
+
+    if target == "cpu":
+        setup.extend([
+            "module load gcc/13.3.0",
+            "module load fftw/3.3.10",
+            "module load openmpi/5.0.3",
+            "module load libxc/7.0.0",
+            "module load openblas/0.3.30",
+            "module load hdf5/1.14.6",
+            "module load scalapack/2.2.0",
+            f"module load qe/{version}",
+        ])
+    else:
+        setup.extend([
+            "module load nvhpc/26.5",
+            "module load fftw/3.3.10",
+            "module load hpcx/2.50",
+            "module load libxc/7.0.0",
+            "module load openblas/0.3.30",
+            "module load hdf5/1.14.6",
+            "module load scalapack/2.2.0",
+            f"module load qe/{version}",
+        ])
+
+    return setup
+
+def build_slurm_job(job):
+    ntasks = job["resources"]["ntasks"]
+
+    launcher = f"mpirun -np {ntasks}"
+
+    return {
+        "name": job.get("name", job["code"]),
+        "resources": job["resources"],
+        "setup": build_module_commands(job),
+        "command": (
+            f"{launcher} {job['code']} -in {job['input']}"
+        ),
+    }
+
+def main():
+    args = parse_args()
+
+    try:
+        job = merge_defaults(load_job(args.yaml_file))
+        validate_job(job)
+
+        if args.ntasks is not None:
+            job["resources"]["ntasks"] = args.ntasks
+
+        if args.memory is not None:
+            job["resources"]["memory"] = args.memory
+
+        if args.walltime is not None:
+            job["resources"]["time"] = args.walltime
+
+        slurm_job = build_slurm_job(job)
+
+        runslurm = Path(__file__).resolve().parent / "runslurm"
+
+        command = [str(runslurm)]
+
+        if args.dry_run:
+            command.append("--dry-run")
+
+        subprocess.run(
+            command,
+            input=json.dumps(slurm_job),
+            text=True,
+            check=True,
+        )
+
+        return 0
+
+    except FileNotFoundError as exc:
+        print(f"submit_qe: error: {exc}", file=sys.stderr)
+        return 1
+
+    except (ValueError, yaml.YAMLError) as exc:
+        print(f"submit_qe: error: {exc}", file=sys.stderr)
+        return 1
+
+    except subprocess.CalledProcessError as exc:
+        print(
+            f"submit_qe: runslurm failed with exit code "
+            f"{exc.returncode}",
+            file=sys.stderr,
+        )
+        return exc.returncode
+
+
+if __name__ == "__main__":
+    sys.exit(main())

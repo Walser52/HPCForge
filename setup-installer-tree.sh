@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+# Setup the installer tree for HPCForge. 
 source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 
 mkdir -p \

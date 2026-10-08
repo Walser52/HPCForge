@@ -10,6 +10,9 @@ The project was developed to build Quantum ESPRESSO and its dependencies, but it
     ```
     ./installers/02-openmpi.sh --version 4.1.8 --force
     ```
+
+## To seee if a module exists:
+    module spider lammps
 # Directory Layout
 
 ```

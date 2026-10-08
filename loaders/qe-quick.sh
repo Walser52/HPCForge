@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+#Usage:
+# source qe-quick.sh 7.4 gpu
+#
+#
+#
+
 set -euo pipefail
 
 usage() {
@@ -15,6 +21,7 @@ TARGET="${2,,}"
 source "$(dirname "${BASH_SOURCE[0]}")/../config.sh" #Get Modules path from config.sh
 module purge
 module use "$MODULES/Core" 
+
 
 case "$TARGET" in
     gpu)
@@ -44,3 +51,4 @@ case "$TARGET" in
         exit 1
         ;;
 esac
+

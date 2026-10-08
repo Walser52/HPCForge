@@ -1,0 +1,52 @@
+site_name: HPCForge
+site_description: Reproducible software deployment for HPC environments
+site_author: Sheharyar Pervez
+
+theme:
+  name: material
+
+nav:
+  - Home: index.md
+
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quick Start: getting-started/quick-start.md
+      - First Build: getting-started/first-build.md
+
+  - Concepts:
+      - Overview: concepts/overview.md
+      - Toolchains: concepts/toolchains.md
+      - Dependencies: concepts/dependencies.md
+      - Modules: concepts/modules.md
+      - Build Profiles: concepts/build-profiles.md
+      - Directory Layout: concepts/directory-layout.md
+
+  - User Guide:
+      - Building Software: user-guide/building-software.md
+      - Build Options: user-guide/build-options.md
+      - CPU and GPU Builds: user-guide/cpu-gpu.md
+      - Module-only Builds: user-guide/module-only.md
+      - Forcing Rebuilds: user-guide/forcing-rebuilds.md
+      - Troubleshooting: user-guide/troubleshooting.md
+
+  - Packages:
+      - FFTW: packages/fftw.md
+      - OpenMPI: packages/openmpi.md
+      - ScaLAPACK: packages/scalapack.md
+      - LibXC: packages/libxc.md
+      - HDF5: packages/hdf5.md
+      - Quantum ESPRESSO: packages/qe.md
+      - LAMMPS: packages/lammps.md
+      - ORCA: packages/orca.md
+
+  - Developer Guide:
+      - Architecture: developer/architecture.md
+      - Adding a Package: developer/adding-a-package.md
+      - Installer Anatomy: developer/installer-anatomy.md
+      - Module Generation: developer/module-generation.md
+      - Coding Conventions: developer/coding-conventions.md
+
+  - Reference:
+      - CLI: reference/cli.md
+      - Environment Variables: reference/environment-variables.md
+      - Package Matrix: reference/package-matrix.md

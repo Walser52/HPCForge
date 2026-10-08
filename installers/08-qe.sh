@@ -53,7 +53,11 @@ fi
 
 select_toolchain
 load_toolchain
-load_dependencies openblas fftw scalapack libxc hdf5
+load_dependencies openblas fftw scalapack libxc
+
+if ! $LITE; then
+    load_dependencies hdf5
+fi
 
 if $GPU; then
     validate_gpu_configuration
@@ -65,7 +69,13 @@ fi
 
 NAME="qe"
 
-VERSION="${VERSION_OVERRIDE:-$QE_VERSION}"
+VERSION="${VERSION_OVERRIDE:-$QE_VERSION}" #version to use
+
+if $LITE; then
+    MODULE_VERSION="$VERSION-lite" #module name
+else
+    MODULE_VERSION="$VERSION"
+fi
 
 ##############################################################################
 # Installation
@@ -85,11 +95,11 @@ VERSION="${VERSION_OVERRIDE:-$QE_VERSION}"
 #
 ##############################################################################
 
-BASE_INSTALL="$(install_dir "$NAME" "$VERSION")"
+BASE_INSTALL="$(install_dir "$NAME" "$MODULE_VERSION")"
 
 INSTALL="$BASE_INSTALL/$COMPILER/$COMPILER_VERSION/$MPI/$MPI_VERSION"
 
-BUILD_DIR="$BUILD/qe-$VERSION-$COMPILER-$COMPILER_VERSION-$MPI-$MPI_VERSION"
+BUILD_DIR="$BUILD/qe-$MODULE_VERSION-$COMPILER-$COMPILER_VERSION-$MPI-$MPI_VERSION"
 
 ##############################################################################
 # Prerequisites
@@ -136,13 +146,16 @@ find_package_library "$LIBXC_ROOT" libxcf03.so >/dev/null \
         exit 1
     }
 
-echo "Finding HDF5"
+if ! $LITE; then
 
-find_package_library "$HDF5_ROOT" libhdf5.so >/dev/null \
-    || {
-        echo "HDF5 not found."
-        exit 1
-    }
+    echo "Finding HDF5"
+
+    find_package_library "$HDF5_ROOT" libhdf5.so >/dev/null \
+        || {
+            echo "HDF5 not found."
+            exit 1
+        }
+fi
 
 ##############################################################################
 # Build / Install
@@ -274,19 +287,31 @@ if ! $MODULE_ONLY; then
             -DCMAKE_PREFIX_PATH="$OPENBLAS_ROOT;$FFTW_ROOT;$SCALAPACK_ROOT"
 
             -DLIBXC_ROOT="$LIBXC_ROOT"
-            -DHDF5_ROOT="$HDF5_ROOT"
 
             ##################################################################
             # QE features
             ##################################################################
-
             -DQE_ENABLE_MPI=ON
             -DQE_ENABLE_OPENMP=ON
 
             -DQE_ENABLE_SCALAPACK=ON
-            -DQE_ENABLE_HDF5=ON
             -DQE_ENABLE_LIBXC=ON
         )
+
+        ######################################################################
+        # LITE build additional arguments
+        ######################################################################
+
+        if $LITE; then
+            CMAKE_ARGS+=(
+                -DQE_ENABLE_HDF5=OFF
+            )
+        else
+            CMAKE_ARGS+=(
+                -DHDF5_ROOT="$HDF5_ROOT"
+                -DQE_ENABLE_HDF5=ON
+            )
+        fi
 
         ######################################################################
         # GPU build additional arguments
@@ -368,19 +393,28 @@ fi
 echo
 echo "Generating module..."
 
+MODULE_DEPENDENCIES=(
+    "openblas/$OPENBLAS_VERSION"
+    "fftw/$FFTW_VERSION"
+    "libxc/$LIBXC_VERSION"
+    "scalapack/$SCALAPACK_VERSION"
+)
+
+if ! $LITE; then
+    MODULE_DEPENDENCIES+=(
+        "hdf5/$HDF5_VERSION"
+    )
+fi
+
 write_module \
     mpi \
     "$NAME" \
-    "$VERSION" \
+    "$MODULE_VERSION" \
     "$INSTALL" \
     "" \
     "$COMPILER/$COMPILER_VERSION" \
     "$MPI/$MPI_VERSION" \
-    "openblas/$OPENBLAS_VERSION" \
-    "fftw/$FFTW_VERSION" \
-    "libxc/$LIBXC_VERSION" \
-    "scalapack/$SCALAPACK_VERSION" \
-    "hdf5/$HDF5_VERSION"
+    "${MODULE_DEPENDENCIES[@]}"
 
 ##############################################################################
 # Summary
